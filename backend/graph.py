@@ -6,13 +6,13 @@ from langgraph.graph import (
 )
 from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
-from state import ChatState
+from .state import ChatState
 
 
 load_dotenv()
 
 # Create llm going to use for the chatbot
-llm = ChatGoogleGenerativeAI(model="gemini-flash-2.5")
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
 def chat_node(state: ChatState):
     # extract the message
@@ -22,7 +22,7 @@ def chat_node(state: ChatState):
     response = llm.invoke(messages)
 
     # now return the response
-    return {'messgaes': [response]} 
+    return {'messages': [response]} 
 
 # Now create a graph for the workflow
 graph = StateGraph(ChatState)
