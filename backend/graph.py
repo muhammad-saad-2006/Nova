@@ -4,9 +4,9 @@ from langgraph.graph import (
     START,
     END
 )
-from langgraph.checkpoint.memory import InMemorySaver
 from dotenv import load_dotenv
 from .state import ChatState
+from .database import checkpointer
 
 
 load_dotenv()
@@ -32,12 +32,10 @@ graph.add_node("chat_node", chat_node)
 graph.add_edge(START, "chat_node")
 graph.add_edge("chat_node", END)
 
-# create checkpoints
-"""
-Currently the memory is stored in RAM which will work for a session which once closed lead to loss of all memory.
-Will add the database integration later.
-"""
-checkpointer = InMemorySaver()  
 
 # Now compile the graph
+"""
+Now we have added sqlite3 a small database to maintain our chat history.
+Rather then maintaing in RAM
+"""
 chatbot = graph.compile(checkpointer=checkpointer)
