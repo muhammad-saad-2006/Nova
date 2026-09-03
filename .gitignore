@@ -9,3 +9,8 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# sqlite files
+nova.db
+nova.db-shm
+nova.db-wal
