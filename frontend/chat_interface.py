@@ -1,5 +1,10 @@
 import streamlit as st
 from backend.graph import chatbot
+from backend.database import (
+    add_thread,
+    update_title,
+    retrieve_all_threads
+)
 from langchain_core.messages import HumanMessage
 import uuid
 
@@ -8,17 +13,20 @@ import uuid
 def generate_thread_id():
     thread_id = uuid.uuid4()
 
-    return thread_id
+    return str(thread_id)
+
 
 def reset_chat():
     thread_id = generate_thread_id()
+
     st.session_state['thread_id'] = thread_id
-    add_thread(st.session_state['thread_id'])
     st.session_state['message_history'] = []
 
-def add_thread(thread_id, title="New Conversation"):
-    if thread_id not in st.session_state['chat_threads']:
-        st.session_state['chat_threads'][thread_id] = title
+    add_thread(thread_id)
+
+    st.session_state['chat_threads'][thread_id] = "New Conversation"
+    st.query_params['thread_id'] = thread_id
+
 
 def load_conversation(thread_id):
     state = chatbot.get_state(
@@ -26,6 +34,7 @@ def load_conversation(thread_id):
     )
 
     return state.values.get('messages', [])
+
 
 def generate_title(message):
     words = message.split()
@@ -44,13 +53,56 @@ def generate_title(message):
 if 'message_history' not in st.session_state:
     st.session_state['message_history'] = []
 
-if 'thread_id' not in st.session_state:
-    st.session_state['thread_id'] = generate_thread_id()
 
 if "chat_threads" not in st.session_state:
-    st.session_state['chat_threads'] = {}
 
-add_thread(st.session_state['thread_id'])
+    st.session_state['chat_threads'] = retrieve_all_threads()
+
+if "thread_id" in st.query_params:
+
+    thread_id = st.query_params["thread_id"]
+
+    if thread_id in st.session_state['chat_threads']:
+        st.session_state['thread_id'] = thread_id
+
+        messages = load_conversation(thread_id)
+
+        temp_messages = []
+
+        for message in messages:
+
+            if isinstance(message, HumanMessage):
+                role = "user"
+            else:
+                role = "assistant"
+
+            temp_messages.append({
+                "role": role,
+                "content": message.content
+            })
+
+        st.session_state['message_history'] = temp_messages
+
+    else:
+        thread_id = generate_thread_id()
+
+        st.session_state['thread_id'] = thread_id
+
+        add_thread(thread_id)
+
+        st.session_state['chat_threads'][thread_id] = "New Conversation"
+
+        st.query_params['thread_id'] = thread_id
+else:
+
+    thread_id = generate_thread_id()
+    st.session_state['thread_id'] = thread_id
+
+    add_thread(thread_id)
+
+    st.session_state["chat_threads"][thread_id] = "New Conversation"
+
+    st.query_params['thread_id'] = thread_id
 
 # --------------------------------------------
 
@@ -61,22 +113,30 @@ CONFIG = {'configurable': {'thread_id': st.session_state['thread_id']}}
 st.sidebar.title("Nova")
 
 if st.sidebar.button("New Chat"):
+
     reset_chat()
 
 st.sidebar.header("New Conversation")
 
 for thread_id, title in reversed(list(st.session_state['chat_threads'].items())):
-    if st.sidebar.button(title):
+
+    if st.sidebar.button(title, key=f"chat_{thread_id}"):
+
         st.session_state['thread_id'] = thread_id
+
+        st.query_params['thread_id'] = thread_id
+
         messages = load_conversation(thread_id)
 
         temp_messages = []
 
         for message in messages:
+
             if isinstance(message, HumanMessage):
                 role = 'user'
             else:
                 role = 'assistant'
+
             temp_messages.append({'role':role, 'content':message.content})
 
         st.session_state['message_history'] = temp_messages
@@ -88,6 +148,7 @@ for thread_id, title in reversed(list(st.session_state['chat_threads'].items()))
 
 # loading the conversation history
 for message in st.session_state['message_history']:
+
     with st.chat_message(message['role']):
         st.text(message['content'])
 
@@ -100,7 +161,10 @@ if user_input:
     # Generate title for new conversation
     if st.session_state['chat_threads'][thread_id] == "New Conversation":
         title = generate_title(user_input)
+
         st.session_state['chat_threads'][thread_id] = title
+
+        update_title(thread_id, title)
 
     # messages from user
     st.session_state['message_history'].append({'role': 'user', 'content': user_input})
@@ -109,7 +173,6 @@ if user_input:
         st.text(user_input)
 
     # reply from ai
-   
     with st.chat_message('assistant'):
         ai_message = st.write_stream(
             message_chunk.content for message_chunk, metadata in chatbot.stream(
